@@ -1,0 +1,34 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game of Life</title>
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body class="bg-gray-900 text-white">
+
+  <!-- UI Controls -->
+  <div id="ui" class="fixed top-5 left-1/2 transform -translate-x-1/2 flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-3 sm:space-y-0 z-10">
+    <button id="startButton" class="w-full sm:w-auto px-4 py-2 bg-green-500 hover:bg-green-600 rounded shadow transition duration-200 disabled:opacity-50">
+      Start
+    </button>
+    <button id="pauseButton" class="w-full sm:w-auto px-4 py-2 bg-yellow-500 hover:bg-yellow-600 rounded shadow transition duration-200 disabled:opacity-50" disabled>
+      Pause
+    </button>
+    <button id="stopButton" class="w-full sm:w-auto px-4 py-2 bg-red-500 hover:bg-red-600 rounded shadow transition duration-200 disabled:opacity-50" disabled>
+      Stop
+    </button>
+    <button id="resetButton" class="w-full sm:w-auto px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded shadow transition duration-200 disabled:opacity-50">
+      Reset
+    </button>
+    <button id="randomizeButton" class="w-full sm:w-auto px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded shadow transition duration-200 disabled:opacity-50">
+      Randomize
+    </button>
+  </div>
+
+  <!-- The Three.js canvas will be appended here by the renderer -->
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
