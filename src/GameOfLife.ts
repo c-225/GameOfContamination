@@ -1,5 +1,3 @@
-// src/GameOfLife.ts
-
 export class GameOfLife {
     width: number;
     height: number;

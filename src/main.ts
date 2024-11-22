@@ -13,7 +13,7 @@ import { GameOfLife } from "./GameOfLife";
 const GRID_WIDTH = 512;
 const GRID_HEIGHT = 512;
 const CELL_SIZE = 1; // Adjust for cell scaling
-const STEP_INTERVAL = 100; // Milliseconds between steps
+const STEP_INTERVAL = 50; // Milliseconds between steps
 
 // Initialize Game of Life with empty grid
 const gameOfLife = new GameOfLife(GRID_WIDTH, GRID_HEIGHT);
@@ -37,7 +37,7 @@ const camera = new THREE.PerspectiveCamera(
     1000
 );
 // Position the camera so that the entire grid is visible
-camera.position.set(0, 0, Math.max(GRID_WIDTH, GRID_HEIGHT) * 1.5);
+camera.position.set(0, 0, 15);
 
 // Make the camera look at the center of the grid
 camera.lookAt(0, 0, 0);
@@ -54,7 +54,6 @@ const cellMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff00,
     transparent: true,
     opacity: 1,
-    side: THREE.DoubleSide,
 });
 
 const gridHelper = new THREE.GridHelper(
@@ -220,8 +219,8 @@ function updateMesh(game: GameOfLife) {
                 // Show the cell by setting scale to 1
                 dummy.scale.set(1, 1, 1);
             } else {
-                // Hide the cell by setting scale to a minimal value
-                dummy.scale.set(0.01, 0.01, 1);
+                // Hide the cell by setting scale to 0
+                dummy.scale.set(0, 0, 0);
             }
             // Position cells centered around (0,0)
             dummy.position.set(
@@ -312,7 +311,7 @@ function onMouseDown(event: MouseEvent) {
     }
 }
 
-function onMouseUp(event: MouseEvent) {
+function onMouseUp(_: MouseEvent) {
     isDragging = false;
     lastHoveredCell = null;
 }
@@ -364,6 +363,12 @@ function handleCellToggle(event: MouseEvent) {
 }
 
 function handleMouseMove(event: MouseEvent) {
+    if (isRunning) {
+        indicator.visible = false;
+        return;
+    }
+
+
     // Calculate mouse position in normalized device coordinates (-1 to +1)
     const rect = renderer.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(
