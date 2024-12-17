@@ -31,14 +31,20 @@ export class GameOfLife {
         }
     }
 
-    // Toggles the state of a specific cell and updates neighbor counts accordingly
-    toggleCell(x: number, y: number) {
+    getCell(x: number, y: number): number {
+        if (x < 0 || x >= this.width || y < 0 || y >= this.height) return 0;
+        return this.currentGrid[y * this.width + x];
+    }
+
+    setCell(x: number, y: number, value: number) {
         if (x < 0 || x >= this.width || y < 0 || y >= this.height) return;
         const index = y * this.width + x;
         const isAlive = this.currentGrid[index] === 1;
-        this.currentGrid[index] = isAlive ? 0 : 1;
-        const delta = isAlive ? -1 : 1;
-        this.updateNeighborCounts(x, y, delta);
+        if (isAlive !== !!value) {
+            this.currentGrid[index] = value;
+            const delta = value === 1 ? 1 : -1;
+            this.updateNeighborCounts(x, y, delta);
+        }
     }
 
     // Advances the grid by one generation using cached neighbor counts

@@ -1,19 +1,24 @@
-// src/main.ts
 import './style.css';
 
 import * as THREE from 'three';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GameOfLife } from "./GameOfLife";
+import { WebcamProcessor } from "./webcamProcessor.ts";
 
 // -------------------------
 // Three.js Setup and Rendering
 // -------------------------
 
 // Constants
-const GRID_WIDTH = 512;
-const GRID_HEIGHT = 512;
+const GRID_WIDTH = 256;
+const GRID_HEIGHT = 256;
 const CELL_SIZE = 1; // Adjust for cell scaling
 const STEP_INTERVAL = 50; // Milliseconds between steps
+
+// FPS Calculation Variables
+let frameCount = 0;
+let fps = 0;
+let lastFpsUpdate = performance.now();
 
 // Initialize Game of Life with empty grid
 const gameOfLife = new GameOfLife(GRID_WIDTH, GRID_HEIGHT);
@@ -28,6 +33,9 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
+
+// Initialize WebCam
+const webcamProcessor = new WebcamProcessor();
 
 // Initialize Camera
 const camera = new THREE.PerspectiveCamera(
@@ -47,6 +55,8 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; // Smooth camera movements
 controls.dampingFactor = 0.05;
 controls.enableRotate = false; // Disable rotation initially
+controls.enablePan = false; // Disable panning
+controls.enableZoom = false; // Disable zooming
 
 // Create InstancedMesh for cells
 const cellGeometry = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
@@ -54,6 +64,7 @@ const cellMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff00,
     transparent: true,
     opacity: 1,
+    side: THREE.DoubleSide,
 });
 
 const gridHelper = new THREE.GridHelper(
@@ -121,12 +132,41 @@ const pauseButton = document.getElementById('pauseButton') as HTMLButtonElement;
 const stopButton = document.getElementById('stopButton') as HTMLButtonElement;
 const resetButton = document.getElementById('resetButton') as HTMLButtonElement;
 const randomizeButton = document.getElementById('randomizeButton') as HTMLButtonElement;
+const webcamButton = document.getElementById('webcamButton') as HTMLButtonElement;
+
+// Nouveaux boutons de mode
+const penModeButton = document.getElementById('penModeButton') as HTMLButtonElement;
+const eraserModeButton = document.getElementById('eraserModeButton') as HTMLButtonElement;
+const cameraModeButton = document.getElementById('cameraModeButton') as HTMLButtonElement;
+
+const uiContainer = document.getElementById('ui');
+
+// Ajouter Undo/Redo
+const undoButton = document.createElement('button');
+undoButton.innerHTML = '<i class="fas fa-undo"></i>';
+undoButton.className = 'w-full sm:w-auto px-4 py-3 bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 rounded shadow transition duration-200 disabled:opacity-50 mt-2 flex items-center justify-center';
+undoButton.disabled = true;
+
+const redoButton = document.createElement('button');
+redoButton.innerHTML = '<i class="fas fa-redo"></i>';
+redoButton.className = 'w-full sm:w-auto px-4 py-3 bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 rounded shadow transition duration-200 disabled:opacity-50 mt-2 flex items-center justify-center';
+redoButton.disabled = true;
+
+uiContainer?.appendChild(undoButton);
+uiContainer?.appendChild(redoButton);
 
 // Simulation state
 let isRunning = false;
 
 // Initial Grid State
 let initialGrid: Uint8Array | null = null;
+
+// Current Mode State: 'drawing' or 'camera'
+let currentMode: 'drawing' | 'camera' = 'drawing'; // Default mode
+
+// Drawing Mode State: 'draw' or 'erase'
+type DrawingMode = 'draw' | 'erase';
+let drawingMode: DrawingMode = 'draw'; // Default to 'draw'
 
 // FPS Counter Elements
 const fpsContainer = document.createElement('div');
@@ -135,10 +175,18 @@ fpsContainer.className = 'fixed top-5 right-5 bg-black bg-opacity-50 text-white 
 fpsContainer.innerText = 'FPS: 0';
 document.body.appendChild(fpsContainer);
 
-// FPS Calculation Variables
-let frameCount = 0;
-let fps = 0;
-let lastFpsUpdate = performance.now();
+interface CellChange {
+    x: number;
+    y: number;
+    oldValue: number;
+    newValue: number;
+}
+type Stroke = CellChange[];
+const undoStack: Stroke[] = [];
+const redoStack: Stroke[] = [];
+
+// The current stroke being drawn
+let currentStroke: Stroke | null = null;
 
 // Helper Functions to Manage Button States
 function updateButtonStates() {
@@ -147,10 +195,18 @@ function updateButtonStates() {
     stopButton.disabled = !isRunning;
     resetButton.disabled = isRunning; // Disable reset when running
     randomizeButton.disabled = isRunning; // Disable randomize when running
+    webcamButton.disabled = isRunning; // Disable webcam when running
+    penModeButton.disabled = isRunning;
+    eraserModeButton.disabled = isRunning;
+    cameraModeButton.disabled = isRunning;
+
+    // Disable undo/redo while running
+    undoButton.disabled = isRunning || undoStack.length === 0;
+    redoButton.disabled = isRunning || redoStack.length === 0;
 }
 
 function saveInitialState() {
-	initialGrid = gameOfLife.getGridCopy();
+    initialGrid = gameOfLife.getGridCopy();
 }
 
 function restoreInitialState() {
@@ -160,13 +216,41 @@ function restoreInitialState() {
     }
 }
 
+// Mode management functions
+function switchToCameraMode() {
+    currentMode = 'camera';
+    controls.enabled = true; // Enable OrbitControls
+    enableCameraControls();
+    disableCellPlacement();
+
+    cameraModeButton.classList.remove('opacity-50');
+    penModeButton.classList.add('opacity-50');
+    eraserModeButton.classList.add('opacity-50');
+}
+
+function switchToDrawingMode(drawMode: DrawingMode) {
+    currentMode = 'drawing';
+    controls.enabled = false; // Disable OrbitControls
+    disableCameraControls();
+    enableCellPlacement();
+    drawingMode = drawMode;
+    if (drawingMode === 'draw') {
+        penModeButton.classList.remove('opacity-50');
+        eraserModeButton.classList.add('opacity-50');
+    } else {
+        eraserModeButton.classList.remove('opacity-50');
+        penModeButton.classList.add('opacity-50');
+    }
+    cameraModeButton.classList.add('opacity-50');
+}
+
 // Event Listeners for Buttons
 startButton.addEventListener('click', () => {
     if (!isRunning) {
         isRunning = true;
         saveInitialState();
         updateButtonStates();
-        disableCellPlacement(); // Disable cell placement
+        switchToCameraMode(); // Automatically switch to Camera Mode
     }
 });
 
@@ -174,7 +258,7 @@ pauseButton.addEventListener('click', () => {
     if (isRunning) {
         isRunning = false;
         updateButtonStates();
-        enableCellPlacement(); // Enable cell placement
+        switchToDrawingMode('draw'); // Automatically switch to Drawing Mode (pen by default)
     }
 });
 
@@ -183,9 +267,8 @@ stopButton.addEventListener('click', () => {
         isRunning = false;
     }
     updateButtonStates();
-    controls.enableRotate = false; // Disable camera rotation
     restoreInitialState(); // Restore the initial grid state
-    enableCellPlacement(); // Ensure cell placement is enabled
+    switchToDrawingMode('draw'); // Automatically switch to Drawing Mode (pen)
 });
 
 resetButton.addEventListener('click', () => {
@@ -193,6 +276,9 @@ resetButton.addEventListener('click', () => {
     updateMesh(gameOfLife);
     // Reset initialGrid since the grid has been modified
     initialGrid = null;
+    undoStack.length = 0;
+    redoStack.length = 0;
+    updateButtonStates();
 });
 
 randomizeButton.addEventListener('click', () => {
@@ -200,10 +286,88 @@ randomizeButton.addEventListener('click', () => {
     updateMesh(gameOfLife);
     // Reset initialGrid since the grid has been modified
     initialGrid = null;
+    undoStack.length = 0;
+    redoStack.length = 0;
+    updateButtonStates();
 });
+
+webcamButton.addEventListener('click', async () => {
+    await webcamProcessor.startWebcam();
+    // 64x64 grid
+    const grid = await webcamProcessor.captureAndProcessImage();
+
+    // Create a new UInt8Array with the grid data
+    const newGrid = new Uint8Array(GRID_WIDTH * GRID_HEIGHT);
+    // set at center
+    const xStart = Math.floor(GRID_WIDTH / 2) - 32;
+    const yStart = Math.floor(GRID_HEIGHT / 2) - 32;
+    for (let y = 0; y < 64; y++) {
+        for (let x = 0; x < 64; x++) {
+            newGrid[(y + yStart) * GRID_WIDTH + x + xStart] = grid[63 - y][x];
+        }
+    }
+
+    gameOfLife.setGrid(newGrid);
+    updateMesh(gameOfLife);
+
+    webcamProcessor.stopWebcam();
+    undoStack.length = 0;
+    redoStack.length = 0;
+    updateButtonStates();
+});
+
+// Nouveaux évènements pour les boutons de mode
+penModeButton.addEventListener('click', () => {
+    if (!isRunning) {
+        switchToDrawingMode('draw');
+    }
+});
+
+eraserModeButton.addEventListener('click', () => {
+    if (!isRunning) {
+        switchToDrawingMode('erase');
+    }
+});
+
+cameraModeButton.addEventListener('click', () => {
+    if (!isRunning) {
+        switchToCameraMode();
+    }
+});
+
+// *** NEW: Undo and Redo event listeners ***
+undoButton.addEventListener('click', undo);
+redoButton.addEventListener('click', redo);
+
+function undo() {
+    if (undoStack.length === 0) return;
+    const stroke = undoStack.pop()!;
+    // Revert each change
+    for (const change of stroke) {
+        gameOfLife.setCell(change.x, change.y, change.oldValue);
+    }
+    redoStack.push(stroke);
+    updateMesh(gameOfLife);
+    updateButtonStates();
+}
+
+function redo() {
+    if (redoStack.length === 0) return;
+    const stroke = redoStack.pop()!;
+    // Reapply each change
+    for (const change of stroke) {
+        gameOfLife.setCell(change.x, change.y, change.newValue);
+    }
+    undoStack.push(stroke);
+    updateMesh(gameOfLife);
+    updateButtonStates();
+}
 
 // Initialize button states on load
 updateButtonStates();
+
+// Démarrage en mode dessin (stylo)
+switchToDrawingMode('draw');
 
 // -------------------------
 // Functions
@@ -277,67 +441,137 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// -------------------------
-// Handle User Interaction: Drag Drawing
-// -------------------------
+// Maintain a map to track active pointers
+const activePointers: Map<number, { x: number, y: number }> = new Map();
 
-let isDragging = false;
-let lastHoveredCell: { x: number, y: number } | null = null;
+// Variable to track drawing state per pointer
+const drawingPointers: Set<number> = new Set();
 
-// Event Listeners for Drag Drawing
-renderer.domElement.addEventListener('mousedown', onMouseDown, false);
-renderer.domElement.addEventListener('mouseup', onMouseUp, false);
-renderer.domElement.addEventListener('mouseleave', onMouseUp, false);
-renderer.domElement.addEventListener('mousemove', onMouseMoveDrag, false);
+// Pointer Event Listeners
+renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
+renderer.domElement.addEventListener('pointerup', onPointerUp, false);
+renderer.domElement.addEventListener('pointercancel', onPointerUp, false);
+renderer.domElement.addEventListener('pointermove', onPointerMove, false);
 
-// Function to disable cell placement
+// Prevent default touch actions
+renderer.domElement.style.touchAction = 'none';
+
+// Disable/Enable cell placement
 function disableCellPlacement() {
     renderer.domElement.style.cursor = 'default';
 }
-
-// Function to enable cell placement
 function enableCellPlacement() {
     renderer.domElement.style.cursor = 'crosshair';
 }
 
-// Initialize with cell placement enabled
-enableCellPlacement();
+// Enable/disable camera controls
+function enableCameraControls() {
+    controls.enableRotate = true;
+    controls.enablePan = true;
+    controls.enableZoom = true;
+}
 
-function onMouseDown(event: MouseEvent) {
-    // Only respond to left-click (button === 0)
-    if (!isRunning && event.button === 0) {
-        isDragging = true;
-        handleCellToggle(event);
+function disableCameraControls() {
+    controls.enableRotate = false;
+    controls.enablePan = false;
+    controls.enableZoom = false;
+}
+
+// Unified Pointer Down Handler
+function onPointerDown(event: PointerEvent) {
+    if (event.button !== 0) return; // Only handle primary button
+
+    if (isRunning) return; // Disable drawing when simulation is running
+
+    if (currentMode === 'drawing') {
+        drawingPointers.add(event.pointerId);
+        // Start a new stroke
+        currentStroke = [];
+        handleDrawing(event);
     }
 }
 
-function onMouseUp(_: MouseEvent) {
-    isDragging = false;
+function onPointerUp(event: PointerEvent) {
+    drawingPointers.delete(event.pointerId);
+    activePointers.delete(event.pointerId);
     lastHoveredCell = null;
+    // Finalize stroke
+    if (currentStroke && currentStroke.length > 0) {
+        undoStack.push(currentStroke);
+        // Clear redo stack because we made a new change
+        redoStack.length = 0;
+        currentStroke = null;
+        updateButtonStates();
+    }
 }
 
-function onMouseMoveDrag(event: MouseEvent) {
-    if (isRunning) {
+function onPointerMove(event: PointerEvent) {
+    if (currentMode === 'camera') {
         handleMouseMove(event);
         return;
     }
 
-    if (isDragging && event.buttons === 1) { // Only if left mouse button is held
-        handleCellToggle(event);
-    } else {
-        handleMouseMove(event);
+    if (currentMode === 'drawing') {
+        if (event.buttons !== 1) return; // Only handle left-click drag
+        if (drawingPointers.has(event.pointerId)) {
+            handleDrawing(event);
+        }
+    }
+
+    handleMouseMove(event);
+}
+
+// Bresenham line function for interpolation
+function bresenhamLine(x0: number, y0: number, x1: number, y1: number): {x:number,y:number}[] {
+    const points = [];
+    const dx = Math.abs(x1 - x0);
+    const sx = x0 < x1 ? 1 : -1;
+    const dy = -Math.abs(y1 - y0);
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    let x = x0;
+    let y = y0;
+    while(true) {
+        points.push({x, y});
+        if (x === x1 && y === y1) break;
+        const e2 = 2 * err;
+        if (e2 >= dy) {
+            err += dy;
+            x += sx;
+        }
+        if (e2 <= dx) {
+            err += dx;
+            y += sy;
+        }
+    }
+    return points;
+}
+
+// Set a single cell and record the change
+function setSingleCell(x: number, y: number, value: number) {
+    const oldValue = gameOfLife.getCell(x, y);
+    if (oldValue !== value) {
+        gameOfLife.setCell(x, y, value);
+        updateMesh(gameOfLife);
+        if (currentStroke) {
+            currentStroke.push({ x, y, oldValue, newValue: value });
+        }
     }
 }
 
-function handleCellToggle(event: MouseEvent) {
-    // Calculate mouse position in normalized device coordinates (-1 to +1)
+let lastHoveredCell: { x: number, y: number } | null = null;
+
+function handleDrawing(event: PointerEvent) {
+    const { clientX, clientY } = event;
+
+    // Calculate pointer position in normalized device coordinates (-1 to +1)
     const rect = renderer.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -((event.clientY - rect.top) / rect.height) * 2 + 1
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1
     );
 
-    // Raycast to find intersected objects
+    // Raycast to find intersection with the grid plane
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
 
@@ -347,36 +581,46 @@ function handleCellToggle(event: MouseEvent) {
     raycaster.ray.intersectPlane(plane, intersectPoint);
 
     if (intersectPoint) {
-        // Calculate cell coordinates based on intersect point
-        const x = Math.floor((intersectPoint.x + (GRID_WIDTH * CELL_SIZE) / 2) / CELL_SIZE);
-        const y = Math.floor((intersectPoint.y + (GRID_HEIGHT * CELL_SIZE) / 2) / CELL_SIZE);
+        // Calculate cell coordinates
+        const xCoord = Math.floor((intersectPoint.x + (GRID_WIDTH * CELL_SIZE) / 2) / CELL_SIZE);
+        const yCoord = Math.floor((intersectPoint.y + (GRID_HEIGHT * CELL_SIZE) / 2) / CELL_SIZE);
 
-        if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
-            // Avoid toggling the same cell multiple times during a drag
-            if (!lastHoveredCell || lastHoveredCell.x !== x || lastHoveredCell.y !== y) {
-                gameOfLife.toggleCell(x, y);
-                updateMesh(gameOfLife);
-                lastHoveredCell = { x, y };
+        if (xCoord >= 0 && xCoord < GRID_WIDTH && yCoord >= 0 && yCoord < GRID_HEIGHT) {
+            // Determine the value based on the current drawing mode
+            const value = drawingMode === 'draw' ? 1 : 0;
+
+            // If we have a lastHoveredCell, interpolate line
+            if (lastHoveredCell && (lastHoveredCell.x !== xCoord || lastHoveredCell.y !== yCoord)) {
+                const linePoints = bresenhamLine(lastHoveredCell.x, lastHoveredCell.y, xCoord, yCoord);
+                for (const p of linePoints) {
+                    setSingleCell(p.x, p.y, value);
+                }
+                lastHoveredCell = { x: xCoord, y: yCoord };
+            } else if (!lastHoveredCell) {
+                // First cell in stroke
+                setSingleCell(xCoord, yCoord, value);
+                lastHoveredCell = { x: xCoord, y: yCoord };
             }
         }
     }
 }
 
-function handleMouseMove(event: MouseEvent) {
-    if (isRunning) {
+function handleMouseMove(event: PointerEvent) {
+    if (isRunning || currentMode === 'camera') {
         indicator.visible = false;
         return;
     }
 
+    const { clientX, clientY } = event;
 
     // Calculate mouse position in normalized device coordinates (-1 to +1)
     const rect = renderer.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -((event.clientY - rect.top) / rect.height) * 2 + 1
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1
     );
 
-    // Raycast to find intersected objects
+    // Raycast to find intersection with the grid plane
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
 
@@ -386,16 +630,16 @@ function handleMouseMove(event: MouseEvent) {
     raycaster.ray.intersectPlane(plane, intersectPoint);
 
     if (intersectPoint) {
-        // Calculate cell coordinates based on intersect point
-        const x = Math.floor((intersectPoint.x + (GRID_WIDTH * CELL_SIZE) / 2) / CELL_SIZE);
-        const y = Math.floor((intersectPoint.y + (GRID_HEIGHT * CELL_SIZE) / 2) / CELL_SIZE);
+        // Calculate cell coordinates
+        const xCoord = Math.floor((intersectPoint.x + (GRID_WIDTH * CELL_SIZE) / 2) / CELL_SIZE);
+        const yCoord = Math.floor((intersectPoint.y + (GRID_HEIGHT * CELL_SIZE) / 2) / CELL_SIZE);
 
-        if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
-            // Position the indicator square at the center of the hovered cell
+        if (xCoord >= 0 && xCoord < GRID_WIDTH && yCoord >= 0 && yCoord < GRID_HEIGHT) {
+            // Position the indicator square
             indicator.position.set(
-                x * CELL_SIZE - (GRID_WIDTH * CELL_SIZE) / 2 + CELL_SIZE / 2,
-                y * CELL_SIZE - (GRID_HEIGHT * CELL_SIZE) / 2 + CELL_SIZE / 2,
-                0.01 // Slightly above the grid
+                xCoord * CELL_SIZE - (GRID_WIDTH * CELL_SIZE) / 2 + CELL_SIZE / 2,
+                yCoord * CELL_SIZE - (GRID_HEIGHT * CELL_SIZE) / 2 + CELL_SIZE / 2,
+                0.01
             );
             indicator.visible = true;
         } else {
@@ -408,3 +652,59 @@ function handleMouseMove(event: MouseEvent) {
 
 // Prevent default context menu on right-click
 renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+
+// Initialize the animation loop
+animate(0);
+
+// Keyboard Shortcut for Drawing Mode Toggle (Press 'E' or 'e' to switch between Draw and Erase)
+window.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key === 'e' || event.key === 'E') {
+        if (currentMode === 'drawing') {
+            drawingMode = drawingMode === 'draw' ? 'erase' : 'draw';
+            if (drawingMode === 'draw') {
+                penModeButton.classList.remove('opacity-50');
+                eraserModeButton.classList.add('opacity-50');
+            } else {
+                eraserModeButton.classList.remove('opacity-50');
+                penModeButton.classList.add('opacity-50');
+            }
+        }
+    }
+});
+
+// Help Modal Elements
+const helpModal = document.getElementById('helpModal') as HTMLDivElement;
+const helpButton = document.getElementById('helpButton') as HTMLButtonElement;
+const closeHelpModal = document.getElementById('closeHelpModal') as HTMLButtonElement;
+
+// Function to Show the Help Modal
+function showHelpModal() {
+  helpModal.classList.remove('hidden');
+}
+
+// Function to Hide the Help Modal
+function hideHelpModal() {
+  helpModal.classList.add('hidden');
+}
+
+// Show the Help Modal on Page Load
+window.addEventListener('DOMContentLoaded', () => {
+  showHelpModal();
+});
+
+// Event Listener for Help Button
+helpButton.addEventListener('click', () => {
+  showHelpModal();
+});
+
+// Event Listener for Close Button within the Modal
+closeHelpModal.addEventListener('click', () => {
+  hideHelpModal();
+});
+
+// Optional: Close the modal when clicking outside the modal content
+helpModal.addEventListener('click', (event) => {
+  if (event.target === helpModal) {
+    hideHelpModal();
+  }
+});
