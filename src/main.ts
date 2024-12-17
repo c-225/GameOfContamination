@@ -134,23 +134,14 @@ const resetButton = document.getElementById('resetButton') as HTMLButtonElement;
 const randomizeButton = document.getElementById('randomizeButton') as HTMLButtonElement;
 const webcamButton = document.getElementById('webcamButton') as HTMLButtonElement;
 
-// Nouveaux boutons de mode
 const penModeButton = document.getElementById('penModeButton') as HTMLButtonElement;
 const eraserModeButton = document.getElementById('eraserModeButton') as HTMLButtonElement;
 const cameraModeButton = document.getElementById('cameraModeButton') as HTMLButtonElement;
 
 const uiContainer = document.getElementById('ui');
 
-// Ajouter Undo/Redo
-const undoButton = document.createElement('button');
-undoButton.innerHTML = '<i class="fas fa-undo"></i>';
-undoButton.className = 'w-full sm:w-auto px-4 py-3 bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 rounded shadow transition duration-200 disabled:opacity-50 mt-2 flex items-center justify-center';
-undoButton.disabled = true;
-
-const redoButton = document.createElement('button');
-redoButton.innerHTML = '<i class="fas fa-redo"></i>';
-redoButton.className = 'w-full sm:w-auto px-4 py-3 bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 rounded shadow transition duration-200 disabled:opacity-50 mt-2 flex items-center justify-center';
-redoButton.disabled = true;
+const undoButton = document.getElementById('undoButton') as HTMLButtonElement;
+const redoButton = document.getElementById('redoButton') as HTMLButtonElement;
 
 uiContainer?.appendChild(undoButton);
 uiContainer?.appendChild(redoButton);
@@ -169,11 +160,7 @@ type DrawingMode = 'draw' | 'erase';
 let drawingMode: DrawingMode = 'draw'; // Default to 'draw'
 
 // FPS Counter Elements
-const fpsContainer = document.createElement('div');
-fpsContainer.id = 'fpsCounter';
-fpsContainer.className = 'fixed top-5 right-5 bg-black bg-opacity-50 text-white text-sm p-2 rounded z-50';
-fpsContainer.innerText = 'FPS: 0';
-document.body.appendChild(fpsContainer);
+const fpsContainer = document.getElementById('fpsCounter') as HTMLDivElement;
 
 interface CellChange {
     x: number;
