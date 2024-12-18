@@ -535,6 +535,11 @@ function onPointerUp(event: PointerEvent) {
         currentStroke = null;
         updateButtonStates();
     }
+
+    if (drawingPointers.size === 0) {
+        lastHoveredCell = null;
+        indicator.visible = false;
+    }
 }
 
 function onPointerMove(event: PointerEvent) {
