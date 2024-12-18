@@ -59,7 +59,7 @@ controls.enablePan = false; // Disable panning
 controls.enableZoom = false; // Disable zooming
 
 // Create InstancedMesh for cells
-const cellGeometry = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
+const cellGeometry = new THREE.BoxGeometry(CELL_SIZE - 0.1, CELL_SIZE - 0.1, 0.1);
 const cellMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff00,
     transparent: true,
