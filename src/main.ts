@@ -138,13 +138,8 @@ const penModeButton = document.getElementById('penModeButton') as HTMLButtonElem
 const eraserModeButton = document.getElementById('eraserModeButton') as HTMLButtonElement;
 const cameraModeButton = document.getElementById('cameraModeButton') as HTMLButtonElement;
 
-const uiContainer = document.getElementById('ui');
-
 const undoButton = document.getElementById('undoButton') as HTMLButtonElement;
 const redoButton = document.getElementById('redoButton') as HTMLButtonElement;
-
-uiContainer?.appendChild(undoButton);
-uiContainer?.appendChild(redoButton);
 
 // Simulation state
 let isRunning = false;
