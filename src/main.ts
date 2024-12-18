@@ -339,13 +339,32 @@ webcamButton.addEventListener('click', async () => {
         }
     }
 
+    const oldGrid = gameOfLife.getGridCopy();
+
     gameOfLife.setGrid(newGrid);
     updateMesh(gameOfLife);
 
-    webcamProcessor.stopWebcam();
-    undoStack.length = 0;
-    redoStack.length = 0;
+    // Compare oldGrid and newGrid to find all cell changes
+    const stroke: Stroke = [];
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            const oldValue = oldGrid[y * GRID_WIDTH + x];
+            const newValue = newGrid[y * GRID_WIDTH + x];
+            if (oldValue !== newValue) {
+                stroke.push({ x, y, oldValue, newValue });
+            }
+        }
+    }
+
+    // If there are changes, push the stroke to the undoStack and clear redoStack
+    if (stroke.length > 0) {
+        undoStack.push(stroke);
+        redoStack.length = 0;
+    }
+
     updateButtonStates();
+
+    webcamProcessor.stopWebcam();
 });
 
 // Mode Buttons Event Listeners
@@ -367,7 +386,6 @@ cameraModeButton.addEventListener('click', () => {
     }
 });
 
-// *** NEW: Undo and Redo event listeners ***
 undoButton.addEventListener('click', undo);
 redoButton.addEventListener('click', redo);
 
@@ -739,7 +757,7 @@ closeHelpModal.addEventListener('click', () => {
   hideHelpModal();
 });
 
-// Optional: Close the modal when clicking outside the modal content
+// Close the modal when clicking outside the modal content
 helpModal.addEventListener('click', (event) => {
   if (event.target === helpModal) {
     hideHelpModal();
