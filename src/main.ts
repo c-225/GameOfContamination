@@ -10,8 +10,8 @@ import { WebcamProcessor } from "./webcamProcessor.ts";
 // -------------------------
 
 // Constants
-const GRID_WIDTH = 256;
-const GRID_HEIGHT = 256;
+const GRID_WIDTH = 128;
+const GRID_HEIGHT = 128;
 const CELL_SIZE = 1; // Adjust for cell scaling
 let STEP_INTERVAL = 1000; // Initially X1: 1 step per second
 
