@@ -13,7 +13,7 @@ import { WebcamProcessor } from "./webcamProcessor.ts";
 const GRID_WIDTH = 256;
 const GRID_HEIGHT = 256;
 const CELL_SIZE = 1; // Adjust for cell scaling
-const STEP_INTERVAL = 50; // Milliseconds between steps
+let STEP_INTERVAL = 1000; // Initially X1: 1 step per second
 
 // FPS Calculation Variables
 let frameCount = 0;
@@ -157,6 +157,7 @@ let drawingMode: DrawingMode = 'draw'; // Default to 'draw'
 // FPS Counter Elements
 const fpsContainer = document.getElementById('fpsCounter') as HTMLDivElement;
 
+// Undo/Redo Structures
 interface CellChange {
     x: number;
     y: number;
@@ -170,7 +171,56 @@ const redoStack: Stroke[] = [];
 // The current stroke being drawn
 let currentStroke: Stroke | null = null;
 
+// -------------------------
+// Speed Control Setup
+// -------------------------
+
+// Define Speed Settings
+interface SpeedSetting {
+    label: string;
+    stepsPerSecond: number;
+}
+
+const speedSettings: SpeedSetting[] = [
+    { label: 'X1', stepsPerSecond: 1 },
+    { label: 'X2', stepsPerSecond: 2 },
+    { label: 'X5', stepsPerSecond: 5 },
+    { label: 'X10', stepsPerSecond: 10 },
+    { label: 'X100', stepsPerSecond: 100 },
+];
+
+let currentSpeedIndex = 0; // Start with X1
+
+// Reference to the Speed Button
+const speedButton = document.getElementById('speedButton') as HTMLButtonElement;
+
+// Initialize Speed Button Label
+speedButton.innerText = `${speedSettings[currentSpeedIndex].label}`;
+
+// Function to Update STEP_INTERVAL Based on Current Speed
+function updateStepInterval() {
+    STEP_INTERVAL = 1000 / speedSettings[currentSpeedIndex].stepsPerSecond;
+}
+
+// Function to Cycle to the Next Speed
+function cycleSpeed() {
+    currentSpeedIndex = (currentSpeedIndex + 1) % speedSettings.length;
+    const currentSpeed = speedSettings[currentSpeedIndex];
+    speedButton.innerText = `${currentSpeed.label}`;
+    updateStepInterval();
+}
+
+// Add Event Listener to Speed Button
+speedButton.addEventListener('click', () => {
+    cycleSpeed();
+});
+
+// Initialize STEP_INTERVAL based on initial speed
+updateStepInterval();
+
+// -------------------------
 // Helper Functions to Manage Button States
+// -------------------------
 function updateButtonStates() {
     startButton.disabled = isRunning;
     pauseButton.disabled = !isRunning;
@@ -298,7 +348,7 @@ webcamButton.addEventListener('click', async () => {
     updateButtonStates();
 });
 
-// Nouveaux évènements pour les boutons de mode
+// Mode Buttons Event Listeners
 penModeButton.addEventListener('click', () => {
     if (!isRunning) {
         switchToDrawingMode('draw');
@@ -348,7 +398,7 @@ function redo() {
 // Initialize button states on load
 updateButtonStates();
 
-// Démarrage en mode dessin (stylo)
+// Start in drawing mode (pen)
 switchToDrawingMode('draw');
 
 // -------------------------
