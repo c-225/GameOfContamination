@@ -255,9 +255,9 @@ function switchToCameraMode() {
     enableCameraControls();
     disableCellPlacement();
 
-    cameraModeButton.classList.remove('opacity-50');
-    penModeButton.classList.add('opacity-50');
-    eraserModeButton.classList.add('opacity-50');
+    cameraModeButton.classList.remove('opacity-70');
+    penModeButton.classList.add('opacity-70');
+    eraserModeButton.classList.add('opacity-70');
 }
 
 function switchToDrawingMode(drawMode: DrawingMode) {
@@ -267,13 +267,13 @@ function switchToDrawingMode(drawMode: DrawingMode) {
     enableCellPlacement();
     drawingMode = drawMode;
     if (drawingMode === 'draw') {
-        penModeButton.classList.remove('opacity-50');
-        eraserModeButton.classList.add('opacity-50');
+        penModeButton.classList.remove('opacity-70');
+        eraserModeButton.classList.add('opacity-70');
     } else {
-        eraserModeButton.classList.remove('opacity-50');
-        penModeButton.classList.add('opacity-50');
+        eraserModeButton.classList.remove('opacity-70');
+        penModeButton.classList.add('opacity-70');
     }
-    cameraModeButton.classList.add('opacity-50');
+    cameraModeButton.classList.add('opacity-70');
 }
 
 // Event Listeners for Buttons
@@ -717,11 +717,11 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
         if (currentMode === 'drawing') {
             drawingMode = drawingMode === 'draw' ? 'erase' : 'draw';
             if (drawingMode === 'draw') {
-                penModeButton.classList.remove('opacity-50');
-                eraserModeButton.classList.add('opacity-50');
+                penModeButton.classList.remove('opacity-70');
+                eraserModeButton.classList.add('opacity-70');
             } else {
-                eraserModeButton.classList.remove('opacity-50');
-                penModeButton.classList.add('opacity-50');
+                eraserModeButton.classList.remove('opacity-70');
+                penModeButton.classList.add('opacity-70');
             }
         }
     }
@@ -763,3 +763,12 @@ helpModal.addEventListener('click', (event) => {
     hideHelpModal();
   }
 });
+
+// Disable the webcam button if the device does not support have a camera
+// @ts-ignore
+const getMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+getMedia({ video: true }, () => {
+    webcamButton.disabled = false;
+}, () => {
+    webcamButton.disabled = true;
+})
