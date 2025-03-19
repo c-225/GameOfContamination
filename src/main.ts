@@ -2,7 +2,7 @@ import './style.css';
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GameOfLife } from "./GameOfLife";
+import { GameOfContamination } from "./GameOfContamination.ts";
 import { WebcamProcessor } from "./webcamProcessor.ts";
 
 // -------------------------
@@ -10,8 +10,8 @@ import { WebcamProcessor } from "./webcamProcessor.ts";
 // -------------------------
 
 // Constants
-const GRID_WIDTH = 128;
-const GRID_HEIGHT = 128;
+let GRID_WIDTH = 13;
+let GRID_HEIGHT = 13;
 const CELL_SIZE = 1; // Adjust for cell scaling
 let STEP_INTERVAL = 1000; // Initially X1: 1 step per second
 
@@ -20,9 +20,12 @@ let frameCount = 0;
 let fps = 0;
 let lastFpsUpdate = performance.now();
 
+// Contamination Calculation Variables
+let init = 0;
+
 // Initialize Game of Life with empty grid
-const gameOfLife = new GameOfLife(GRID_WIDTH, GRID_HEIGHT);
-gameOfLife.reset(); // Start with an empty grid
+let gameOfCont = new GameOfContamination(GRID_WIDTH, GRID_HEIGHT);
+gameOfCont.reset(); // Start with an empty grid
 
 // Initialize Three.js Scene
 const scene = new THREE.Scene();
@@ -61,68 +64,76 @@ controls.enableZoom = false; // Disable zooming
 // Create InstancedMesh for cells
 const cellGeometry = new THREE.BoxGeometry(CELL_SIZE - 0.1, CELL_SIZE - 0.1, 0.5);
 const cellMaterial = new THREE.MeshBasicMaterial({
-    color: 0x00ff00,
+    color: 0xeeaaff,
     transparent: true,
     opacity: 1,
     side: THREE.DoubleSide,
 });
+    // -------------------------
+    // Raycaster Indicator Setup
+    // -------------------------
 
-const gridHelper = new THREE.GridHelper(
-    GRID_WIDTH * CELL_SIZE,
-    GRID_WIDTH,
-    0x444444,
-    0x444444
-);
-scene.add(gridHelper);
+    // Create a square indicator
+    let indicatorGeometry = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
+    let indicatorMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        opacity: 0.5,
+        transparent: true,
+        side: THREE.DoubleSide,
+    });
 
-// Center the grid helper at (0,0)
-gridHelper.position.set(0, 0, 0);
-gridHelper.rotation.x = -Math.PI / 2; // Rotate to lie on XZ plane
+    let indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
+    indicator.visible = false; // Initially hidden
+    scene.add(indicator);
 
-const maxCells = GRID_WIDTH * GRID_HEIGHT;
-const instancedMesh = new THREE.InstancedMesh(cellGeometry, cellMaterial, maxCells);
+let maxCells:number;
+let instancedMesh: THREE.InstancedMesh;
 
 // Temporary Object3D for setting instance matrices
-const dummy = new THREE.Object3D();
+let dummy = new THREE.Object3D();
 
-// Initialize InstancedMesh positions
-let instanceCount = 0;
-for (let y = 0; y < GRID_HEIGHT; y++) {
-    for (let x = 0; x < GRID_WIDTH; x++) {
-        // Center the grid around (0,0)
-        dummy.position.set(
-            x * CELL_SIZE - (GRID_WIDTH * CELL_SIZE) / 2 + CELL_SIZE / 2,
-            y * CELL_SIZE - (GRID_HEIGHT * CELL_SIZE) / 2 + CELL_SIZE / 2,
-            0
-        );
-        dummy.scale.set(0.01, 0.01, 1); // Initially hide all cells
-        dummy.updateMatrix();
-        instancedMesh.setMatrixAt(instanceCount++, dummy.matrix);
+let gridHelper: THREE.GridHelper;
+
+// Initialize the grid and InstancedMesh
+function initGrid(){
+    gridHelper = new THREE.GridHelper( //init
+        GRID_WIDTH * CELL_SIZE,
+        GRID_WIDTH,
+        0x444444,
+        0x444444
+    );
+    scene.add(gridHelper);
+    
+    maxCells = GRID_WIDTH * GRID_HEIGHT;
+    instancedMesh = new THREE.InstancedMesh(cellGeometry, cellMaterial, maxCells);
+
+    // Center the grid helper at (0,0) init
+    gridHelper.position.set(0, 0, 0);
+    gridHelper.rotation.x = -Math.PI / 2; // Rotate to lie on XZ plane
+
+    // Initialize InstancedMesh positions init
+    let instanceCount = 0;
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+            // Center the grid around (0,0)
+            dummy.position.set(
+                x * CELL_SIZE - (GRID_WIDTH * CELL_SIZE) / 2 + CELL_SIZE / 2,
+                y * CELL_SIZE - (GRID_HEIGHT * CELL_SIZE) / 2 + CELL_SIZE / 2,
+                0
+            );
+            dummy.scale.set(0, 0, 0); // Initially hide all cells
+            dummy.updateMatrix();
+            instancedMesh.setMatrixAt(instanceCount++, dummy.matrix);
+        }
     }
+
+    // Set initial visibility based on Game of Life state init
+    updateMesh(gameOfCont);
+
+    // Add InstancedMesh to the scene init
+    scene.add(instancedMesh);
+
 }
-
-// Set initial visibility based on Game of Life state
-updateMesh(gameOfLife);
-
-// Add InstancedMesh to the scene
-scene.add(instancedMesh);
-
-// -------------------------
-// Raycaster Indicator Setup
-// -------------------------
-
-// Create a square indicator
-const indicatorGeometry = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-const indicatorMaterial = new THREE.MeshBasicMaterial({
-    color: 0xff0000,
-    opacity: 0.5,
-    transparent: true,
-    side: THREE.DoubleSide,
-});
-const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
-indicator.visible = false; // Initially hidden
-scene.add(indicator);
-
 // -------------------------
 // UI Controls Setup
 // -------------------------
@@ -133,6 +144,7 @@ const stopButton = document.getElementById('stopButton') as HTMLButtonElement;
 const resetButton = document.getElementById('resetButton') as HTMLButtonElement;
 const randomizeButton = document.getElementById('randomizeButton') as HTMLButtonElement;
 const webcamButton = document.getElementById('webcamButton') as HTMLButtonElement;
+const sizeButton = document.getElementById('sizeButton') as HTMLButtonElement;
 
 const penModeButton = document.getElementById('penModeButton') as HTMLButtonElement;
 const eraserModeButton = document.getElementById('eraserModeButton') as HTMLButtonElement;
@@ -156,6 +168,10 @@ let drawingMode: DrawingMode = 'draw'; // Default to 'draw'
 
 // FPS Counter Elements
 const fpsContainer = document.getElementById('fpsCounter') as HTMLDivElement;
+
+// Contamination Counter Elements
+const contaContainer = document.getElementById('contaCounter') as HTMLDivElement;
+const contaInitContainer = document.getElementById('contaInitCounter') as HTMLDivElement;
 
 // Undo/Redo Structures
 interface CellChange {
@@ -231,6 +247,7 @@ function updateButtonStates() {
     penModeButton.disabled = isRunning;
     eraserModeButton.disabled = isRunning;
     cameraModeButton.disabled = isRunning;
+    sizeButton.disabled = isRunning;
 
     // Disable undo/redo while running
     undoButton.disabled = isRunning || undoStack.length === 0;
@@ -238,13 +255,13 @@ function updateButtonStates() {
 }
 
 function saveInitialState() {
-    initialGrid = gameOfLife.getGridCopy();
+    initialGrid = gameOfCont.getGridCopy();
 }
 
 function restoreInitialState() {
     if (initialGrid) {
-        gameOfLife.setGrid(initialGrid);
-        updateMesh(gameOfLife);
+        gameOfCont.setGrid(initialGrid);
+        updateMesh(gameOfCont);
     }
 }
 
@@ -298,14 +315,17 @@ stopButton.addEventListener('click', () => {
     if (isRunning) {
         isRunning = false;
     }
+    gameOfCont.over = false;
+    gameOfCont.contaminated = 0;
+    contaContainer.innerText = `Cases contaminées : ${gameOfCont.contaminated}`;
     updateButtonStates();
     restoreInitialState(); // Restore the initial grid state
     switchToDrawingMode('draw'); // Automatically switch to Drawing Mode (pen)
 });
 
 resetButton.addEventListener('click', () => {
-    gameOfLife.reset();
-    updateMesh(gameOfLife);
+    gameOfCont.reset();
+    updateMesh(gameOfCont);
     // Reset initialGrid since the grid has been modified
     initialGrid = null;
     undoStack.length = 0;
@@ -314,13 +334,27 @@ resetButton.addEventListener('click', () => {
 });
 
 randomizeButton.addEventListener('click', () => {
-    gameOfLife.initialize(0.2); // Adjust density as needed
-    updateMesh(gameOfLife);
+    gameOfCont.initialize(0.2); // Adjust density as needed
+    updateMesh(gameOfCont);
     // Reset initialGrid since the grid has been modified
     initialGrid = null;
     undoStack.length = 0;
     redoStack.length = 0;
     updateButtonStates();
+});
+
+sizeButton.addEventListener('click', () => {
+    const newSize = prompt('Entrez la nouvelle taille de la grille entre 1 et 50', `${GRID_WIDTH}`);
+    if (newSize) {
+        const size = parseInt(newSize);
+        if (size > 0 && size <=50) {
+            GRID_WIDTH = size;
+            GRID_HEIGHT = size;
+            gameOfCont = new GameOfContamination(GRID_WIDTH, GRID_HEIGHT);
+            scene.remove(gridHelper);
+            initGrid();
+        }
+    }
 });
 
 webcamButton.addEventListener('click', async () => {
@@ -339,10 +373,10 @@ webcamButton.addEventListener('click', async () => {
         }
     }
 
-    const oldGrid = gameOfLife.getGridCopy();
+    const oldGrid = gameOfCont.getGridCopy();
 
-    gameOfLife.setGrid(newGrid);
-    updateMesh(gameOfLife);
+    gameOfCont.setGrid(newGrid);
+    updateMesh(gameOfCont);
 
     // Compare oldGrid and newGrid to find all cell changes
     const stroke: Stroke = [];
@@ -394,10 +428,10 @@ function undo() {
     const stroke = undoStack.pop()!;
     // Revert each change
     for (const change of stroke) {
-        gameOfLife.setCell(change.x, change.y, change.oldValue);
+        gameOfCont.setCell(change.x, change.y, change.oldValue);
     }
     redoStack.push(stroke);
-    updateMesh(gameOfLife);
+    updateMesh(gameOfCont);
     updateButtonStates();
 }
 
@@ -406,10 +440,10 @@ function redo() {
     const stroke = redoStack.pop()!;
     // Reapply each change
     for (const change of stroke) {
-        gameOfLife.setCell(change.x, change.y, change.newValue);
+        gameOfCont.setCell(change.x, change.y, change.newValue);
     }
     undoStack.push(stroke);
-    updateMesh(gameOfLife);
+    updateMesh(gameOfCont);
     updateButtonStates();
 }
 
@@ -424,12 +458,13 @@ switchToDrawingMode('draw');
 // -------------------------
 
 // Function to update the InstancedMesh based on Game of Life grid
-function updateMesh(game: GameOfLife) {
+function updateMesh(game: GameOfContamination) {
     let count = 0;
     for (let y = 0; y < game.height; y++) {
         for (let x = 0; x < game.width; x++) {
-            const isAlive = game.currentGrid[y * game.width + x] === 1;
-            if (isAlive) {
+            const isContaminated = game.currentGrid[y * game.width + x] !== 0;
+
+            if (isContaminated) {
                 // Show the cell by setting scale to 1
                 dummy.scale.set(1, 1, 1);
             } else {
@@ -453,7 +488,14 @@ function updateMesh(game: GameOfLife) {
 let lastStepTime = 0;
 
 // Start the animation loop immediately
+initGrid();
 animate(0);
+
+// Win popup elements
+const winScreen = document.getElementById('screenWin') as HTMLDivElement;
+const winContainer = document.getElementById('reussite') as HTMLDivElement;
+const winComment = document.getElementById('commentaire') as HTMLDivElement;
+const closeWinScreen = document.getElementById('closescreenWin') as HTMLButtonElement;
 
 // Animation Loop
 function animate(time: number) {
@@ -471,11 +513,39 @@ function animate(time: number) {
     }
 
     // Step the Game of Life at intervals if running
-    if (isRunning && time - lastStepTime > STEP_INTERVAL) {
-        gameOfLife.step();
-        updateMesh(gameOfLife);
+    if ( !gameOfCont.over && isRunning && time - lastStepTime > STEP_INTERVAL) {
+        gameOfCont.step();
+        updateMesh(gameOfCont);
         lastStepTime = time;
     }
+    
+    else if (gameOfCont.over) {
+        // if every cell is contaminated
+        if (gameOfCont.contaminated === GRID_HEIGHT * GRID_WIDTH) {
+            // and the minimum amount of cells have been initially contaminated
+            winContainer.innerText = `Bravo la grille est entièrement contaminée!`;
+            if (init === GRID_HEIGHT || init === GRID_WIDTH) {
+                winComment.innerText = `Vous avez réussi à contaminer toute la grille avec le moins de cellules initialement contaminées possible!`;
+            }
+            // and the minimum amount of cells have not been initially contaminated
+            else {
+                winComment.innerText = `Cependant il est possible de contaminer moins de cellules initialement. À vous de jouer !`;
+            }
+        }
+        // if not every cell is contaminated
+        else {
+            winContainer.innerText = `Dommage, la grille n'est pas entièrement contaminée!`;
+            winComment.innerText = `Il est possible de contaminer plus de cellules. À vous de jouer !`;
+        }
+        winScreen.classList.remove('hidden');
+        isRunning = false;
+        updateButtonStates();
+        gameOfCont.reset();
+        updateMesh(gameOfCont);
+        init = 0;
+        switchToDrawingMode('draw');  
+    }
+    contaContainer.innerText = `Cases contaminées : ${gameOfCont.contaminated}`;	
 
     controls.update(); // Update camera controls
     renderer.render(scene, camera);
@@ -604,10 +674,10 @@ function bresenhamLine(x0: number, y0: number, x1: number, y1: number): {x:numbe
 
 // Set a single cell and record the change
 function setSingleCell(x: number, y: number, value: number) {
-    const oldValue = gameOfLife.getCell(x, y);
+    const oldValue = gameOfCont.getCell(x, y);
     if (oldValue !== value) {
-        gameOfLife.setCell(x, y, value);
-        updateMesh(gameOfLife);
+        gameOfCont.setCell(x, y, value);
+        updateMesh(gameOfCont);
         if (currentStroke) {
             currentStroke.push({ x, y, oldValue, newValue: value });
         }
@@ -643,21 +713,31 @@ function handleDrawing(event: PointerEvent) {
         if (xCoord >= 0 && xCoord < GRID_WIDTH && yCoord >= 0 && yCoord < GRID_HEIGHT) {
             // Determine the value based on the current drawing mode
             const value = drawingMode === 'draw' ? 1 : 0;
-
             // If we have a lastHoveredCell, interpolate line
             if (lastHoveredCell && (lastHoveredCell.x !== xCoord || lastHoveredCell.y !== yCoord)) {
                 const linePoints = bresenhamLine(lastHoveredCell.x, lastHoveredCell.y, xCoord, yCoord);
                 for (const p of linePoints) {
+                    if (gameOfCont.getCell(p.x,p.y)===0){
+                        if (drawingMode === 'draw') { gameOfCont.contaminated++; }
+                        else { gameOfCont.contaminated--; }
+                    }
                     setSingleCell(p.x, p.y, value);
                 }
                 lastHoveredCell = { x: xCoord, y: yCoord };
             } else if (!lastHoveredCell) {
                 // First cell in stroke
-                setSingleCell(xCoord, yCoord, value);
                 lastHoveredCell = { x: xCoord, y: yCoord };
+                if (gameOfCont.getCell(xCoord, yCoord)===0){
+                    if (drawingMode === 'draw') { gameOfCont.contaminated++; }
+                    else { gameOfCont.contaminated--; }
+                }
+                setSingleCell(xCoord, yCoord, value);
             }
         }
     }
+    contaInitContainer.innerText = `Cases contaminées initialement: ${gameOfCont.contaminated}`;
+    contaContainer.innerText = `Cases contaminées : ${gameOfCont.contaminated}`;
+    init = gameOfCont.contaminated;
 }
 
 function handleMouseMove(event: PointerEvent) {
@@ -706,7 +786,7 @@ function handleMouseMove(event: PointerEvent) {
 }
 
 // Prevent default context menu on right-click
-renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+renderer.domElement.addEventListener('contextmenu', (event: { preventDefault: () => any; }) => event.preventDefault());
 
 // Initialize the animation loop
 animate(0);
@@ -762,6 +842,10 @@ helpModal.addEventListener('click', (event) => {
   if (event.target === helpModal) {
     hideHelpModal();
   }
+});
+
+closeWinScreen.addEventListener('click', () => {
+    winScreen.classList.add('hidden');
 });
 
 // Disable the webcam button if the device does not support have a camera

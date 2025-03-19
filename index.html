@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Jeu de la Vie</title>
+  <title>Jeu de la Contamination</title>
   <link rel="stylesheet" href="./src/style.css">
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/all.min.css" integrity="sha512-5Hs3dF2AEPkpNAR7UiOHba+lRSJNeM2ECkwxUIxC1Q/FLycGTbNapWXB4tP889k5T5Ju8fs4b1P5z/iB4nMfSQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -60,6 +60,11 @@
     >
       <i class="fas fa-random"></i>
     </button>
+    <button
+            id="sizeButton"
+            class="min-w-[48px] sm:min-w-[64px] px-3 sm:px-4 py-2 sm:py-3 bg-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400 rounded shadow transition duration-200 flex items-center justify-center mb-2 sm:mb-0"
+    >
+      <i class="fas fa-expand"></i>
   </div>
 
   <!-- Secondary Controls (Undo, Redo) -->
@@ -117,7 +122,7 @@
 
     <!-- Modal Header -->
     <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-      <h2 id="helpModalTitle" class="text-xl font-bold text-gray-800 dark:text-gray-100">Comment jouer au jeu de la vie</h2>
+      <h2 id="helpModalTitle" class="text-xl font-bold text-gray-800 dark:text-gray-100">Comment jouer au jeu de la Contamination</h2>
       <button id="closeHelpModal" class="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white" aria-label="Close Help Modal">
         <i class="fas fa-times fa-lg"></i>
       </button>
@@ -126,13 +131,11 @@
     <!-- Modal Body -->
     <div class="p-4 overflow-y-auto">
       <p class="text-gray-700 dark:text-gray-300 mb-4">
-        Bienvenue dans le <strong>Jeu de la Vie</strong> ! Ce jeu est une simulation amusante où vous contrôlez des cellules sur une grille. Voici comment cela fonctionne :
+        Bienvenue dans le <strong>Jeu de la Contamination</strong> ! Ce jeu est une simulation amusante où vous contrôlez des cellules sur une grille. Voici comment cela fonctionne :
       </p>
       <ul class="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4">
-        <li><strong>Cellules vivantes :</strong> Les cellules vivantes sont actives sur la grille.</li>
-        <li><strong>Naissance :</strong> Une cellule morte avec exactement 3 voisins vivants devient vivante.</li>
-        <li><strong>Survie :</strong> Une cellule vivante avec 2 ou 3 voisins vivants reste vivante.</li>
-        <li><strong>Mort :</strong> Dans tous les autres cas, les cellules meurent ou restent mortes.</li>
+        <li><strong>Contamination:</strong> Une cellule saine avec au moins 2 voisins contaminés devient elle-même contaminée.</li>
+        <li><strong>Objectif:</strong> Contaminer toutes les cases en contaminant le moins de cellules possible.</li>
       </ul>
       <p class="text-gray-700 dark:text-gray-300">
         Utilisez les contrôles pour démarrer, mettre en pause, réinitialiser ou randomiser la grille. Vous pouvez également dessiner ou effacer des cellules manuellement. Amusez-vous à créer des motifs et à les voir évoluer !
@@ -142,9 +145,40 @@
   </div>
 </div>
 
+<!--Winning screen -->
+<div id="screenWin" class=" hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-100 overflow-y-auto z-50" role="dialog" aria-modal="true" aria-labelledby="screenwinTitle">
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full sm:max-w-md mx-4 sm:mx-0 relative flex flex-col max-h-screen sm:max-h-[80vh]">
+
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+      <h2 id="screenWinTitle" class="text-xl font-bold text-gray-800 dark:text-gray-100">Fin de la partie</h2>
+      <button id="closescreenWin" class="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white" aria-label="Close end screen">
+        <i class="fas fa-times fa-lg"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-4 overflow-y-auto">
+      <p id="reussite" class="text-gray-700 dark:text-gray-300 mb-4"></p>
+      <p id="commentaire" class="text-gray-700 dark:text-gray-300"></p>
+    </div>
+
+  </div>
+</div>
+
+
 <!-- FPS Counter -->
 <div id="fpsCounter" class="fixed top-5 left-5 bg-black bg-opacity-50 text-white text-sm p-2 rounded z-40">
   FPS: 0
+</div>
+
+<!-- Generation Counter -->
+<div id="contaCounter" class="fixed bottom-16 left-5 bg-black bg-opacity-50 text-white text-sm p-2 rounded z-40">
+  Cases contaminées : 0
+</div>
+
+<div id="contaInitCounter" class="fixed bottom-5 left-5 bg-black bg-opacity-50 text-white text-sm p-2 rounded z-40">
+  Cases contaminées initialement: 0
 </div>
 
 <!-- Three.js Canvas will be appended here -->
