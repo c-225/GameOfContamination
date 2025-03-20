@@ -4,7 +4,6 @@ export class GameOfContamination {
     currentGrid: Uint8Array;
     nextGrid: Uint8Array;
     neighborCounts: Uint8Array;
-    contaminated: number;
     over:boolean = false;
 
     constructor(width: number, height: number) {
@@ -13,7 +12,6 @@ export class GameOfContamination {
         this.currentGrid = new Uint8Array(width * height);
         this.nextGrid = new Uint8Array(width * height);
         this.neighborCounts = new Uint8Array(width * height);
-        this.contaminated = 0;
     }
 
     // Resets the grid and neighbor counts to an empty state
@@ -21,7 +19,6 @@ export class GameOfContamination {
         this.currentGrid.fill(0);
         this.nextGrid.fill(0);
         this.neighborCounts.fill(0);
-        this.contaminated = 0;
         this.over = false;
     }
 
@@ -31,7 +28,6 @@ export class GameOfContamination {
         for (let i = 0; i < this.currentGrid.length; i++) {
             if (Math.random() < density) {
                 this.currentGrid[i] = 1;
-                this.contaminated++;
                 this.incrementNeighbors(i);
             }
         }
@@ -69,7 +65,6 @@ export class GameOfContamination {
             }
             if ( neighborContaminated.length >= 2) {
                 this.nextGrid[i] = 1;
-                this.contaminated++;
             }
         }
         if (this.currentGrid.toString() === this.nextGrid.toString()) {
@@ -109,8 +104,8 @@ export class GameOfContamination {
     }
 
     // Creates a copy of the current grid
-    getGridCopy(): Uint8Array {
-        return new Uint8Array(this.currentGrid);
+    getGridCopy(): this {
+        return this
     }
 
     // Sets the grid to a specific state and rebuilds neighbor counts

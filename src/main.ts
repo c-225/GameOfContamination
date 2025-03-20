@@ -10,8 +10,8 @@ import { WebcamProcessor } from "./webcamProcessor.ts";
 // -------------------------
 
 // Constants
-let GRID_WIDTH = 13;
-let GRID_HEIGHT = 13;
+let GRID_WIDTH = 10;
+let GRID_HEIGHT = 10;
 const CELL_SIZE = 1; // Adjust for cell scaling
 let STEP_INTERVAL = 1000; // Initially X1: 1 step per second
 
@@ -22,6 +22,7 @@ let lastFpsUpdate = performance.now();
 
 // Contamination Calculation Variables
 let init = 0;
+let contaminated = 0;
 
 // Initialize Game of Life with empty grid
 let gameOfCont = new GameOfContamination(GRID_WIDTH, GRID_HEIGHT);
@@ -158,6 +159,7 @@ let isRunning = false;
 
 // Initial Grid State
 let initialGrid: Uint8Array | null = null;
+let initialContaminated: number = 0;
 
 // Current Mode State: 'drawing' or 'camera'
 let currentMode: 'drawing' | 'camera' = 'drawing'; // Default mode
@@ -250,17 +252,20 @@ function updateButtonStates() {
     sizeButton.disabled = isRunning;
 
     // Disable undo/redo while running
-    undoButton.disabled = isRunning || undoStack.length === 0;
+    undoButton.disabled = isRunning || undoStack.length === 0; 
     redoButton.disabled = isRunning || redoStack.length === 0;
 }
 
 function saveInitialState() {
-    initialGrid = gameOfCont.getGridCopy();
+    let copy = gameOfCont.getGridCopy()
+    initialGrid = copy.currentGrid;
+    initialContaminated = contaminated;
 }
 
 function restoreInitialState() {
     if (initialGrid) {
         gameOfCont.setGrid(initialGrid);
+        contaminated = initialContaminated;
         updateMesh(gameOfCont);
     }
 }
@@ -316,8 +321,8 @@ stopButton.addEventListener('click', () => {
         isRunning = false;
     }
     gameOfCont.over = false;
-    gameOfCont.contaminated = 0;
-    contaContainer.innerText = `Cases contaminées : ${gameOfCont.contaminated}`;
+    contaminated = 0;
+    contaContainer.innerText = `Cases contaminées : ${contaminated}`; // a revoir
     updateButtonStates();
     restoreInitialState(); // Restore the initial grid state
     switchToDrawingMode('draw'); // Automatically switch to Drawing Mode (pen)
@@ -338,6 +343,7 @@ randomizeButton.addEventListener('click', () => {
     updateMesh(gameOfCont);
     // Reset initialGrid since the grid has been modified
     initialGrid = null;
+    contaminated = 0;
     undoStack.length = 0;
     redoStack.length = 0;
     updateButtonStates();
@@ -352,6 +358,7 @@ sizeButton.addEventListener('click', () => {
             GRID_HEIGHT = size;
             gameOfCont = new GameOfContamination(GRID_WIDTH, GRID_HEIGHT);
             scene.remove(gridHelper);
+            scene.remove(instancedMesh);
             initGrid();
         }
     }
@@ -375,29 +382,37 @@ webcamButton.addEventListener('click', async () => {
 
     const oldGrid = gameOfCont.getGridCopy();
 
+    contaminated = count(newGrid)
     gameOfCont.setGrid(newGrid);
+    init = contaminated;
     updateMesh(gameOfCont);
+    contaInitContainer.innerText = `Cases contaminées initialement: ${init}`;
+
 
     // Compare oldGrid and newGrid to find all cell changes
     const stroke: Stroke = [];
+    let diff = 0;
     for (let y = 0; y < GRID_HEIGHT; y++) {
         for (let x = 0; x < GRID_WIDTH; x++) {
-            const oldValue = oldGrid[y * GRID_WIDTH + x];
+            const oldValue = oldGrid.currentGrid[y * GRID_WIDTH + x];
             const newValue = newGrid[y * GRID_WIDTH + x];
             if (oldValue !== newValue) {
                 stroke.push({ x, y, oldValue, newValue });
+                if (newValue === 1) { diff++; }
+                else { diff--; }
             }
         }
     }
 
+
     // If there are changes, push the stroke to the undoStack and clear redoStack
     if (stroke.length > 0) {
-        undoStack.push(stroke);
+        undoStack.push(stroke);        
         redoStack.length = 0;
     }
 
     updateButtonStates();
-
+    contaminated = diff;
     webcamProcessor.stopWebcam();
 });
 
@@ -426,13 +441,23 @@ redoButton.addEventListener('click', redo);
 function undo() {
     if (undoStack.length === 0) return;
     const stroke = undoStack.pop()!;
+    
     // Revert each change
     for (const change of stroke) {
         gameOfCont.setCell(change.x, change.y, change.oldValue);
+        
     }
     redoStack.push(stroke);
     updateMesh(gameOfCont);
     updateButtonStates();
+}
+
+function count(newGrid: Uint8Array): number {
+    let compteur = 0;
+    for (let index = 0; index < newGrid.length; index++) {
+        if (newGrid[index]===1){compteur++}
+    }
+    return compteur
 }
 
 function redo() {
@@ -463,7 +488,6 @@ function updateMesh(game: GameOfContamination) {
     for (let y = 0; y < game.height; y++) {
         for (let x = 0; x < game.width; x++) {
             const isContaminated = game.currentGrid[y * game.width + x] !== 0;
-
             if (isContaminated) {
                 // Show the cell by setting scale to 1
                 dummy.scale.set(1, 1, 1);
@@ -482,6 +506,7 @@ function updateMesh(game: GameOfContamination) {
         }
     }
     instancedMesh.instanceMatrix.needsUpdate = true;
+    contaContainer.innerText = `Cases contaminées : ${contaminated}`;
 }
 
 // Animation Loop Variables
@@ -515,13 +540,14 @@ function animate(time: number) {
     // Step the Game of Life at intervals if running
     if ( !gameOfCont.over && isRunning && time - lastStepTime > STEP_INTERVAL) {
         gameOfCont.step();
+        contaminated = count(gameOfCont.currentGrid)
         updateMesh(gameOfCont);
         lastStepTime = time;
     }
     
     else if (gameOfCont.over) {
         // if every cell is contaminated
-        if (gameOfCont.contaminated === GRID_HEIGHT * GRID_WIDTH) {
+        if (contaminated === GRID_HEIGHT * GRID_WIDTH) {
             // and the minimum amount of cells have been initially contaminated
             winContainer.innerText = `Bravo la grille est entièrement contaminée!`;
             if (init === GRID_HEIGHT || init === GRID_WIDTH) {
@@ -545,7 +571,7 @@ function animate(time: number) {
         init = 0;
         switchToDrawingMode('draw');  
     }
-    contaContainer.innerText = `Cases contaminées : ${gameOfCont.contaminated}`;	
+    	
 
     controls.update(); // Update camera controls
     renderer.render(scene, camera);
@@ -635,7 +661,7 @@ function onPointerMove(event: PointerEvent) {
         handleMouseMove(event);
         return;
     }
-
+    console.log(contaminated)
     if (currentMode === 'drawing') {
         if (event.buttons !== 1) return; // Only handle left-click drag
         if (drawingPointers.has(event.pointerId)) {
@@ -681,6 +707,7 @@ function setSingleCell(x: number, y: number, value: number) {
         if (currentStroke) {
             currentStroke.push({ x, y, oldValue, newValue: value });
         }
+        contaminated += value === 1 ? 1 : -1
     }
 }
 
@@ -717,10 +744,6 @@ function handleDrawing(event: PointerEvent) {
             if (lastHoveredCell && (lastHoveredCell.x !== xCoord || lastHoveredCell.y !== yCoord)) {
                 const linePoints = bresenhamLine(lastHoveredCell.x, lastHoveredCell.y, xCoord, yCoord);
                 for (const p of linePoints) {
-                    if (gameOfCont.getCell(p.x,p.y)===0){
-                        if (drawingMode === 'draw') { gameOfCont.contaminated++; }
-                        else { gameOfCont.contaminated--; }
-                    }
                     setSingleCell(p.x, p.y, value);
                 }
                 lastHoveredCell = { x: xCoord, y: yCoord };
@@ -728,16 +751,17 @@ function handleDrawing(event: PointerEvent) {
                 // First cell in stroke
                 lastHoveredCell = { x: xCoord, y: yCoord };
                 if (gameOfCont.getCell(xCoord, yCoord)===0){
-                    if (drawingMode === 'draw') { gameOfCont.contaminated++; }
-                    else { gameOfCont.contaminated--; }
+                    if (gameOfCont.getCell(lastHoveredCell.x,lastHoveredCell.y)===0 && drawingMode === 'draw') { contaminated++; }
+                    else if (gameOfCont.getCell(lastHoveredCell.x,lastHoveredCell.y)===1 && drawingMode === 'erase'){ contaminated--; }
                 }
                 setSingleCell(xCoord, yCoord, value);
             }
         }
     }
-    contaInitContainer.innerText = `Cases contaminées initialement: ${gameOfCont.contaminated}`;
-    contaContainer.innerText = `Cases contaminées : ${gameOfCont.contaminated}`;
-    init = gameOfCont.contaminated;
+    contaminated = count(gameOfCont.currentGrid);
+    init = contaminated;
+    contaInitContainer.innerText = `Cases contaminées initialement: ${init}`;
+    contaContainer.innerText = `Cases contaminées : ${contaminated}`;
 }
 
 function handleMouseMove(event: PointerEvent) {
