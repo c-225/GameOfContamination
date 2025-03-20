@@ -661,7 +661,6 @@ function onPointerMove(event: PointerEvent) {
         handleMouseMove(event);
         return;
     }
-    console.log(contaminated)
     if (currentMode === 'drawing') {
         if (event.buttons !== 1) return; // Only handle left-click drag
         if (drawingPointers.has(event.pointerId)) {
