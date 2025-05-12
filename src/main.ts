@@ -1,11 +1,36 @@
+// Allow the JavaScript module to stay as is
+declare module '../../FrameworkThreeJS/framework/js/modal';
+declare module  '../../FrameworkThreeJS/framework/js/CTABanner'
+
 import './style.css';
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GameOfContamination } from "./GameOfContamination.ts";
 import { WebcamProcessor } from "./webcamProcessor.ts";
+import modal from '../../FrameworkThreeJS/framework/js/modal';
+import CTABanner from '../../FrameworkThreeJS/framework/js/CTABanner';
 
-// -------------------------
+// for 2D use of the framework
+
+const ctaBanner = new CTABanner();
+ctaBanner.create_button({ 
+    text: "Regles", 
+    onClick: () => showHelpModal(), 
+});
+const md = new modal(ctaBanner as unknown as null);
+const permanentModalControls = md.getPermanentModal({
+    title: "Game Of Contamination",
+    position: { top: 10, right: 10 },
+    width: "350px",
+    theme: "light", // or "dark"
+    id: "gameSettingsModal" // custom ID allows multiple modals
+}) as any; // Cast to any so that addButton is recognized
+// Now call addButton on the returned controls
+const size = permanentModalControls.addButton("Changer la taille", () => resizegrid());
+size.classes= "min-w-[48px] sm:min-w-[64px] px-3 sm:px-4 py-2 sm:py-3 bg-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400 rounded shadow transition duration-200 flex items-center justify-center mb-2 sm:mb-0"
+    
+//-----------------------------------------------------------// -------------------------
 // Three.js Setup and Rendering
 // -------------------------
 
@@ -109,7 +134,8 @@ function initGrid(){
     instancedMesh = new THREE.InstancedMesh(cellGeometry, cellMaterial, maxCells);
 
     // Center the grid helper at (0,0) init
-    gridHelper.position.set(0, 0, 0);
+    gridHelper.position.set(0, 3, 0);
+    instancedMesh.position.set(0, 3, 0);
     gridHelper.rotation.x = -Math.PI / 2; // Rotate to lie on XZ plane
 
     // Initialize InstancedMesh positions init
@@ -119,7 +145,7 @@ function initGrid(){
             // Center the grid around (0,0)
             dummy.position.set(
                 x * CELL_SIZE - (GRID_WIDTH * CELL_SIZE) / 2 + CELL_SIZE / 2,
-                y * CELL_SIZE - (GRID_HEIGHT * CELL_SIZE) / 2 + CELL_SIZE / 2,
+                y * CELL_SIZE - (GRID_HEIGHT * CELL_SIZE) / 2 + CELL_SIZE / 2 ,
                 0
             );
             dummy.scale.set(0, 0, 0); // Initially hide all cells
@@ -145,7 +171,6 @@ const stopButton = document.getElementById('stopButton') as HTMLButtonElement;
 const resetButton = document.getElementById('resetButton') as HTMLButtonElement;
 const randomizeButton = document.getElementById('randomizeButton') as HTMLButtonElement;
 const webcamButton = document.getElementById('webcamButton') as HTMLButtonElement;
-const sizeButton = document.getElementById('sizeButton') as HTMLButtonElement;
 
 const penModeButton = document.getElementById('penModeButton') as HTMLButtonElement;
 const eraserModeButton = document.getElementById('eraserModeButton') as HTMLButtonElement;
@@ -249,7 +274,7 @@ function updateButtonStates() {
     penModeButton.disabled = isRunning;
     eraserModeButton.disabled = isRunning;
     cameraModeButton.disabled = isRunning;
-    sizeButton.disabled = isRunning;
+    //sizeButton.disabled = isRunning;
 
     // Disable undo/redo while running
     undoButton.disabled = isRunning || undoStack.length === 0; 
@@ -296,6 +321,21 @@ function switchToDrawingMode(drawMode: DrawingMode) {
         penModeButton.classList.add('opacity-70');
     }
     cameraModeButton.classList.add('opacity-70');
+}
+
+function resizegrid(){
+    const newSize = prompt('Entrez la nouvelle taille de la grille entre 1 et 50', `${GRID_WIDTH}`);
+    if (newSize) {
+        const size = parseInt(newSize);
+        if (size > 0 && size <=50) {
+            GRID_WIDTH = size;
+            GRID_HEIGHT = size;
+            gameOfCont = new GameOfContamination(GRID_WIDTH, GRID_HEIGHT);
+            scene.remove(gridHelper);
+            scene.remove(instancedMesh);
+            initGrid();
+        }
+    }
 }
 
 // Event Listeners for Buttons
@@ -349,20 +389,7 @@ randomizeButton.addEventListener('click', () => {
     updateButtonStates();
 });
 
-sizeButton.addEventListener('click', () => {
-    const newSize = prompt('Entrez la nouvelle taille de la grille entre 1 et 50', `${GRID_WIDTH}`);
-    if (newSize) {
-        const size = parseInt(newSize);
-        if (size > 0 && size <=50) {
-            GRID_WIDTH = size;
-            GRID_HEIGHT = size;
-            gameOfCont = new GameOfContamination(GRID_WIDTH, GRID_HEIGHT);
-            scene.remove(gridHelper);
-            scene.remove(instancedMesh);
-            initGrid();
-        }
-    }
-});
+//sizeButton.addEventListener('click', () => {resizegrid()});
 
 webcamButton.addEventListener('click', async () => {
     await webcamProcessor.startWebcam();
@@ -733,8 +760,8 @@ function handleDrawing(event: PointerEvent) {
 
     if (intersectPoint) {
         // Calculate cell coordinates
-        const xCoord = Math.floor((intersectPoint.x + (GRID_WIDTH * CELL_SIZE) / 2) / CELL_SIZE);
-        const yCoord = Math.floor((intersectPoint.y + (GRID_HEIGHT * CELL_SIZE) / 2) / CELL_SIZE);
+        const xCoord = Math.floor((intersectPoint.x + (GRID_WIDTH * CELL_SIZE) / 2) / CELL_SIZE) - instancedMesh.position.x;// in case you move the grid
+        const yCoord = Math.floor((intersectPoint.y + (GRID_HEIGHT * CELL_SIZE) / 2) / CELL_SIZE) - instancedMesh.position.y;
 
         if (xCoord >= 0 && xCoord < GRID_WIDTH && yCoord >= 0 && yCoord < GRID_HEIGHT) {
             // Determine the value based on the current drawing mode
@@ -832,7 +859,6 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
 
 // Help Modal Elements
 const helpModal = document.getElementById('helpModal') as HTMLDivElement;
-const helpButton = document.getElementById('helpButton') as HTMLButtonElement;
 const closeHelpModal = document.getElementById('closeHelpModal') as HTMLButtonElement;
 
 // Function to Show the Help Modal
@@ -851,9 +877,9 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // Event Listener for Help Button
-helpButton.addEventListener('click', () => {
-  showHelpModal();
-});
+//helpButton.addEventListener('click', () => {
+//  showHelpModal();
+//});
 
 // Event Listener for Close Button within the Modal
 closeHelpModal.addEventListener('click', () => {

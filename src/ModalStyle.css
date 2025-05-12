@@ -1,0 +1,199 @@
+/* Modal Core Structure */
+.dynamic-modal {
+    position: fixed;
+    z-index: 1000;
+    background-color: transparent;
+  }
+  
+  /* Modal Content */
+  .modal-content {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    padding: 15px;
+    max-height: 80vh;
+    overflow-y: auto;
+    transition: height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  }
+  
+  /* Theme Styles */
+  .modal-content-light {
+    background-color: #24a1eb;
+    color: #fff
+  }
+  
+  .modal-content-dark {
+    background-color: #333;
+    color: #fff;
+  }
+  
+  /* Modal Title */
+  .modal-title {
+    margin: 0 0 15px 0;
+    padding: 5px;
+    border-bottom: 1px solid #ccc;
+  }
+  
+  .modal-content-dark .modal-title {
+    border-bottom: 1px solid #555;
+  }
+  
+  /* Close/Collapse Button */
+  .modal-close {
+    background-color: transparent;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  
+  .modal-close.modal-close-expanded::before {
+    content: '▲' !important; /* Le !important garantit la priorité */
+    color: #fff;
+  }
+  
+  .modal-close.modal-close-collapsed::before {
+    content: '▼' !important;
+    color: #fff;
+  }
+  /* Draggable Element */
+  .modal-draggable {
+    cursor: move;
+  }
+  
+  /* Form Container */
+  .modal-form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    overflow: hidden;
+  }
+  
+  /* Button Styles */
+  .modal-button {
+    display: block;
+    padding: 10px;
+    margin: 10px auto;
+    cursor: pointer;
+    width: 80%;
+    border: none;
+    border-radius: 40px;
+    transition: background-color 0.3s;
+    color: #fff;
+  }
+  
+  .modal-button-light {
+    color: #fff;
+    background-color: inherit;
+  }
+  
+  .modal-button:hover {
+    background-color: #f9bb12 !important;
+  }
+  
+  .modal-button-dark {
+    color: white;
+    background-color: inherit;
+  }
+  
+  .modal-button-dark:hover {
+    background-color: #f9bb12 !important;
+  }
+  
+  /* Form Controls */
+  .modal-control-container {
+    margin: 5px 0;
+    text-align: left;
+  }
+  
+  .modal-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  
+  /* Slider Components */
+  .modal-slider-container {
+    display: flex;
+    align-items: center;
+  }
+  
+  .modal-slider {
+    flex: 1;
+  }
+  
+  .modal-value-display {
+    margin-left: 10px;
+    min-width: 40px;
+    text-align: right;
+  }
+  
+  /* Checkbox Components */
+  .modal-checkbox-container {
+    margin: 5px 0;
+    text-align: left;
+    display: flex;
+    align-items: center;
+  }
+  
+  .modal-checkbox {
+    margin-right: 10px;
+    transform: scale(1.2);
+  }
+  
+  /* Dropdown Components */
+  .modal-select {
+    width: 100%;
+    padding: 5px;
+    border-radius: 4px;
+  }
+  
+  /* Color Picker Components */
+  .modal-color-picker-container {
+    display: flex;
+    align-items: center;
+  }
+  
+  .modal-color-picker {
+    margin: 0 10px 0 0;
+  }
+  
+  .modal-color-value {
+    font-family: fantasy;
+  }
+  
+  /* Separator */
+  .modal-separator {
+    margin: 10px 0;
+    border: none;
+    border-top: 1px solid #ccc;
+  }
+  
+  /* Text Label Variations */
+  .modal-text-label {
+    margin: 5px 0;
+  }
+  
+  .modal-text-left {
+    text-align: left;
+  }
+  
+  .modal-text-center {
+    text-align: center;
+  }
+  
+  .modal-text-right {
+    text-align: right;
+  }
+  
+  .modal-text-bold {
+    font-weight: bold;
+  }
+  
+  /* Collapsed State */
+  .modal-collapsed {
+    overflow: hidden;
+  }
+  
+  .modal-collapsed .modal-form-container {
+    opacity: 0;
+    display: none;
+  }
