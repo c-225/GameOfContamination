@@ -1,15 +1,14 @@
 // Allow the JavaScript module to stay as is
-declare module '../../FrameworkThreeJS/framework/js/modal';
-declare module  '../../FrameworkThreeJS/framework/js/CTABanner'
+//declare module './../../framework/js/modal';
+declare module  './../framework/js/CTABanner'
 
-import './style.css';
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GameOfContamination } from "./GameOfContamination.ts";
 import { WebcamProcessor } from "./webcamProcessor.ts";
-import modal from '../../FrameworkThreeJS/framework/js/modal';
-import CTABanner from '../../FrameworkThreeJS/framework/js/CTABanner';
+//import modal from './../../framework/js/modal.js';
+import CTABanner from './../framework/js/CTABanner.js';
 
 // for 2D use of the framework
 
@@ -18,18 +17,11 @@ ctaBanner.create_button({
     text: "Regles", 
     onClick: () => showHelpModal(), 
 });
-const md = new modal(ctaBanner as unknown as null);
-const permanentModalControls = md.getPermanentModal({
-    title: "Game Of Contamination",
-    position: { top: 10, right: 10 },
-    width: "350px",
-    theme: "light", // or "dark"
-    id: "gameSettingsModal" // custom ID allows multiple modals
-}) as any; // Cast to any so that addButton is recognized
-// Now call addButton on the returned controls
-const size = permanentModalControls.addButton("Changer la taille", () => resizegrid());
-size.classes= "min-w-[48px] sm:min-w-[64px] px-3 sm:px-4 py-2 sm:py-3 bg-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400 rounded shadow transition duration-200 flex items-center justify-center mb-2 sm:mb-0"
-    
+ctaBanner.create_button({
+    text:"Changer la taille",
+    onClick: () => resizegrid()
+})
+
 //-----------------------------------------------------------// -------------------------
 // Three.js Setup and Rendering
 // -------------------------
@@ -49,7 +41,7 @@ let lastFpsUpdate = performance.now();
 let init = 0;
 let contaminated = 0;
 
-// Initialize Game of Life with empty grid
+// Initialize game of contamination with empty grid
 let gameOfCont = new GameOfContamination(GRID_WIDTH, GRID_HEIGHT);
 gameOfCont.reset(); // Start with an empty grid
 
@@ -86,6 +78,7 @@ controls.dampingFactor = 0.05;
 controls.enableRotate = false; // Disable rotation initially
 controls.enablePan = false; // Disable panning
 controls.enableZoom = false; // Disable zooming
+controls.update()
 
 // Create InstancedMesh for cells
 const cellGeometry = new THREE.BoxGeometry(CELL_SIZE - 0.1, CELL_SIZE - 0.1, 0.5);
@@ -154,7 +147,7 @@ function initGrid(){
         }
     }
 
-    // Set initial visibility based on Game of Life state init
+    // Set initial visibility based on game of contamination state init
     updateMesh(gameOfCont);
 
     // Add InstancedMesh to the scene init
@@ -302,9 +295,9 @@ function switchToCameraMode() {
     enableCameraControls();
     disableCellPlacement();
 
-    cameraModeButton.classList.remove('opacity-70');
-    penModeButton.classList.add('opacity-70');
-    eraserModeButton.classList.add('opacity-70');
+    cameraModeButton.style.opacity='70';
+    penModeButton.style.opacity='70';
+    eraserModeButton.style.opacity='70';
 }
 
 function switchToDrawingMode(drawMode: DrawingMode) {
@@ -314,13 +307,13 @@ function switchToDrawingMode(drawMode: DrawingMode) {
     enableCellPlacement();
     drawingMode = drawMode;
     if (drawingMode === 'draw') {
-        penModeButton.classList.remove('opacity-70');
-        eraserModeButton.classList.add('opacity-70');
+        penModeButton.style.opacity='100';
+        eraserModeButton.style.opacity='70';
     } else {
-        eraserModeButton.classList.remove('opacity-70');
-        penModeButton.classList.add('opacity-70');
+        eraserModeButton.style.opacity='100';
+        penModeButton.style.opacity='70';
     }
-    cameraModeButton.classList.add('opacity-70');
+    cameraModeButton.style.opacity='70';
 }
 
 function resizegrid(){
@@ -389,7 +382,6 @@ randomizeButton.addEventListener('click', () => {
     updateButtonStates();
 });
 
-//sizeButton.addEventListener('click', () => {resizegrid()});
 
 webcamButton.addEventListener('click', async () => {
     await webcamProcessor.startWebcam();
@@ -509,7 +501,7 @@ switchToDrawingMode('draw');
 // Functions
 // -------------------------
 
-// Function to update the InstancedMesh based on Game of Life grid
+// Function to update the InstancedMesh based on game of contamination grid
 function updateMesh(game: GameOfContamination) {
     let count = 0;
     for (let y = 0; y < game.height; y++) {
@@ -564,7 +556,7 @@ function animate(time: number) {
         lastFpsUpdate = now;
     }
 
-    // Step the Game of Life at intervals if running
+    // Step the game of contamination at intervals if running
     if ( !gameOfCont.over && isRunning && time - lastStepTime > STEP_INTERVAL) {
         gameOfCont.step();
         contaminated = count(gameOfCont.currentGrid)
@@ -590,15 +582,14 @@ function animate(time: number) {
             winContainer.innerText = `Dommage, la grille n'est pas entièrement contaminée!`;
             winComment.innerText = `Il est possible de contaminer plus de cellules. À vous de jouer !`;
         }
-        winScreen.classList.remove('hidden');
+        winScreen.style.display='flex';
         isRunning = false;
         updateButtonStates();
         gameOfCont.reset();
         updateMesh(gameOfCont);
-        init = 0;
-        switchToDrawingMode('draw');  
+        init = 0; 
     }
-    	
+        
 
     controls.update(); // Update camera controls
     renderer.render(scene, camera);
@@ -610,7 +601,6 @@ window.addEventListener('resize', onWindowResize, false);
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
@@ -621,10 +611,10 @@ const activePointers: Map<number, { x: number, y: number }> = new Map();
 const drawingPointers: Set<number> = new Set();
 
 // Pointer Event Listeners
-renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
-renderer.domElement.addEventListener('pointerup', onPointerUp, false);
-renderer.domElement.addEventListener('pointercancel', onPointerUp, false);
-renderer.domElement.addEventListener('pointermove', onPointerMove, false);
+document.addEventListener('pointerdown', onPointerDown, false);
+document.addEventListener('pointerup', onPointerUp, false);
+document.addEventListener('pointercancel', onPointerUp, false);
+document.addEventListener('pointermove', onPointerMove, false);
 
 // Prevent default touch actions
 renderer.domElement.style.touchAction = 'none';
@@ -642,12 +632,14 @@ function enableCameraControls() {
     controls.enableRotate = true;
     controls.enablePan = true;
     controls.enableZoom = true;
+    controls.update()
 }
 
 function disableCameraControls() {
     controls.enableRotate = false;
     controls.enablePan = false;
     controls.enableZoom = false;
+    controls.update()
 }
 
 // Unified Pointer Down Handler
@@ -700,14 +692,14 @@ function onPointerMove(event: PointerEvent) {
 
 // Bresenham line function for interpolation
 function bresenhamLine(x0: number, y0: number, x1: number, y1: number): {x:number,y:number}[] {
-    const points = [];
+    const points:{x:number,y:number}[] = [];
     const dx = Math.abs(x1 - x0);
     const sx = x0 < x1 ? 1 : -1;
     const dy = -Math.abs(y1 - y0);
     const sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
-    let x = x0;
-    let y = y0;
+    let x:number = x0;
+    let y:number = y0;
     while(true) {
         points.push({x, y});
         if (x === x1 && y === y1) break;
@@ -759,10 +751,10 @@ function handleDrawing(event: PointerEvent) {
     raycaster.ray.intersectPlane(plane, intersectPoint);
 
     if (intersectPoint) {
+        
         // Calculate cell coordinates
         const xCoord = Math.floor((intersectPoint.x + (GRID_WIDTH * CELL_SIZE) / 2) / CELL_SIZE) - instancedMesh.position.x;// in case you move the grid
         const yCoord = Math.floor((intersectPoint.y + (GRID_HEIGHT * CELL_SIZE) / 2) / CELL_SIZE) - instancedMesh.position.y;
-
         if (xCoord >= 0 && xCoord < GRID_WIDTH && yCoord >= 0 && yCoord < GRID_HEIGHT) {
             // Determine the value based on the current drawing mode
             const value = drawingMode === 'draw' ? 1 : 0;
@@ -836,7 +828,7 @@ function handleMouseMove(event: PointerEvent) {
 }
 
 // Prevent default context menu on right-click
-renderer.domElement.addEventListener('contextmenu', (event: { preventDefault: () => any; }) => event.preventDefault());
+document.addEventListener('contextmenu', (event: { preventDefault: () => any; }) => event.preventDefault());
 
 // Initialize the animation loop
 animate(0);
@@ -847,11 +839,11 @@ window.addEventListener('keydown', (event: KeyboardEvent) => {
         if (currentMode === 'drawing') {
             drawingMode = drawingMode === 'draw' ? 'erase' : 'draw';
             if (drawingMode === 'draw') {
-                penModeButton.classList.remove('opacity-70');
-                eraserModeButton.classList.add('opacity-70');
+                penModeButton.style.opacity='100';
+                eraserModeButton.style.opacity='70';
             } else {
-                eraserModeButton.classList.remove('opacity-70');
-                penModeButton.classList.add('opacity-70');
+                eraserModeButton.style.opacity='100';
+                penModeButton.style.opacity='70';
             }
         }
     }
@@ -863,12 +855,12 @@ const closeHelpModal = document.getElementById('closeHelpModal') as HTMLButtonEl
 
 // Function to Show the Help Modal
 function showHelpModal() {
-  helpModal.classList.remove('hidden');
+  helpModal.style.display = 'flex';
 }
 
 // Function to Hide the Help Modal
 function hideHelpModal() {
-  helpModal.classList.add('hidden');
+  helpModal.style.display = 'none';
 }
 
 // Show the Help Modal on Page Load
@@ -894,7 +886,8 @@ helpModal.addEventListener('click', (event) => {
 });
 
 closeWinScreen.addEventListener('click', () => {
-    winScreen.classList.add('hidden');
+  winScreen.style.display = 'none';
+  switchToDrawingMode('draw'); 
 });
 
 // Disable the webcam button if the device does not support have a camera
